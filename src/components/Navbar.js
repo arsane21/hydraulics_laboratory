@@ -5,6 +5,7 @@ import {
   NavbarToggler,
   NavbarBrand,
   Nav,
+  NavItem,
   UncontrolledDropdown,
   DropdownToggle,
   DropdownMenu,
@@ -77,6 +78,10 @@ const NavHeader = (args) => {
                   <DropdownItem>Reset</DropdownItem>
                 </DropdownMenu>
               </UncontrolledDropdown>
+              <NavItem>
+              <Link to="/specificEnergy"
+              className='nav-link'>Components</Link>
+              </NavItem>
             </Nav>
             <NavbarText>Simple Text</NavbarText>
           </Collapse>

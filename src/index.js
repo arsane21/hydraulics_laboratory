@@ -36,6 +36,8 @@ import DischargeTrapeze from './components/uniformFlow/Discharge/DischargeTrapez
 import DischargeRectangle from './components/uniformFlow/Discharge/DischargeRectangle';
 import DischargeTriangle from './components/uniformFlow/Discharge/DischargeTriangle';
 import DischargeCircle from './components/uniformFlow/Discharge/DischargeCircle';
+import SpecificEnergy from './components/SpecificEnergy/SpecificEnergy';
+import FlowConditionsAfterAStep from './components/SpecificEnergy/FlowConditionsAfterAStep';
 // COMPONENTS
 
 
@@ -80,6 +82,11 @@ root.render(
           <Route path="/flujocritico/profundidadcritica/canaltriangular" element={<CriticalDepthTriangle/>} />
           <Route path="/flujocritico/profundidadcritica/canaltrapezoidal" element={<CriticalDepthTrapeze/>} />
           <Route path="/flujocritico/profundidadCritica/canalcircular" element={<CriticalDepthCircle/>} />
+
+           {/* RUTAS PARA EL CÁLCULO DE LA PROFUNDIDAD CRITICA */}
+           <Route path="/specificEnergy" element={<SpecificEnergy/>} />
+           <Route path="/specificEnergy/flow_conditions_after_a_step" element={<FlowConditionsAfterAStep/>} />
+           
 
       </Routes>
       <Footer/>
