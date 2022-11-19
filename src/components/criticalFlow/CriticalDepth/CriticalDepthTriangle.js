@@ -1,157 +1,335 @@
-import React,{useState} from 'react'
-import NavCriticalDepth from './NavCriticalDepth';
-import {Form,Input,Label,FormGroup,Col,Row,Button,Container} from 'reactstrap'; 
-import { AreaTriangle,WettedPerimeterTriangle,HydraulicRadiusTriangle ,surfaceWidthTriangle,HydraulicDepthTriangle } from '../../../modulos/GeometryElements/Triangle';
+import React, { useState } from "react";
+import NavCriticalDepth from "./NavCriticalDepth";
+import { Col, Row, Container } from "reactstrap";
+import { Form, Field } from "react-final-form";
+import {
+  AreaTriangle,
+  WettedPerimeterTriangle,
+  HydraulicRadiusTriangle,
+  surfaceWidthTriangle,
+  HydraulicDepthTriangle,
+} from "../../../modulos/GeometryElements/Triangle";
 
-import salto from '../../../images/trianglechannel.png';
-import EcnYcTriangle from '../../../images/EcnYcTriangle.PNG';
-import AlertCalculationsWithn from './AlertCalculationsWithn.js';
+import { FlowType } from "../../../modulos/FlowTypeDetermination";
+import { Element } from "react-scroll";
+import { scroller } from "react-scroll";
 
-const DataEntered = ({dataEntered}) => {
-    return (
-        <div>
-        <h5>Datos Ingresados </h5>
-        <ul>            
-            <li>{`Q = ${dataEntered.Q} m^3/s`}</li>
-            <li>{`m1 = ${dataEntered.m1}`}</li>
-            <li>{`m2 = ${dataEntered.m2}`}</li>  
-        </ul>
-    </div>
-    )
-  }
+import trianglechannel from "../../../images/trianglechannel.png";
+import EcnYcTriangle from "../../../images/EcnYcTriangle.PNG";
+import AlertCalculationsWithn from "./AlertCalculationsWithn.js";
 
-const CriticalDepthTriangleResults = ({Data}) => {
+import bisection from "../../../modulos/NumericalAnalysis/bisection";
+import TableBisection from "../../NumericalAnalysis/TableBisection";
+import AlertBisectionFailed from "../../NumericalAnalysis/AlertBisectionFailed";
+import BisectionForm from "../../Forms/BisectionForm";
+
+const required = (value) => (value ? undefined : "Required");
+const mustBeNumber = (value) => (isNaN(value) ? "Must be a number" : undefined);
+const composeValidators =
+  (...validators) =>
+  (value) =>
+    validators.reduce(
+      (error, validator) => error || validator(value),
+      undefined
+    );
+
+const DataEntered = ({ dataEntered }) => {
   return (
     <div>
-        <h3>Rusultado </h3>
-        <ul>
-            <li><strong> {`Yc = ${Data.y} m`}</strong></li>
-            {Data.Sc ? <li><strong> {`Sc = ${Data.Sc} m/m`}</strong></li>: null}
-        </ul>
-        <h6>Características del flujo </h6>
-        <ul>            
-            <li>{`F = ${Data.F} `}</li>
-            <li>{`aquí va el tipo de flujo (subcritico, supercritico o critico)`}</li>  
-        </ul>
+      <h5>Datos Ingresados </h5>
+      <ul>
+        <li>{`Q = ${dataEntered.Q} m^3/s`}</li>
+        <li>{`m1 = ${dataEntered.m1}`}</li>
+        <li>{`m2 = ${dataEntered.m2}`}</li>
+      </ul>
     </div>
-  )
-}
+  );
+};
 
-const GeometryElements = ({Data,dataEntered}) =>{
+const CriticalDepthTriangleResults = ({ Data }) => {
+  return (
+    <div>
+      <h3>Rusultado </h3>
+      <ul>
+        <li>
+          <strong> {`Yc = ${Data.y} m`}</strong>
+        </li>
+        {Data.Sc ? (
+          <li>
+            <strong> {`Sc = ${Data.Sc} m/m`}</strong>
+          </li>
+        ) : null}
+      </ul>
+      <h6>Características del flujo </h6>
+      <ul>
+        <li>{`F = ${Data.F} `}</li>
+        <li>{Data.flowType}</li>
+      </ul>
+    </div>
+  );
+};
 
-    return(
-        <div>
-            <h5>Elementos Geometricos </h5>
-            <ul>
-                <li>{`yc = ${Data.y} m`}</li>
-                <li>{`m1 = ${dataEntered.m1}`}</li>
-                <li>{`m1 = ${dataEntered.m2}`}</li>
-                <li>{`Ac = ${Data.A} m^2`}</li>
-                <li>{`Pc = ${Data.P} m`}</li>
-                <li>{`Rhc = ${Data.R} m`}</li>
-                <li>{`Tc = ${Data.T} m`}</li>
-                <li>{`Dc = ${Data.D} m`}</li>
-            </ul>
-        </div>
-    )
-}
+const GeometryElements = ({ Data, dataEntered }) => {
+  return (
+    <div>
+      <h5>Elementos Geometricos </h5>
+      <ul>
+        <li>{`yc = ${Data.y} m`}</li>
+        <li>{`m1 = ${dataEntered.m1}`}</li>
+        <li>{`m1 = ${dataEntered.m2}`}</li>
+        <li>{`Ac = ${Data.A} m^2`}</li>
+        <li>{`Pc = ${Data.P} m`}</li>
+        <li>{`Rhc = ${Data.R} m`}</li>
+        <li>{`Tc = ${Data.T} m`}</li>
+        <li>{`Dc = ${Data.D} m`}</li>
+      </ul>
+    </div>
+  );
+};
 
-const CriticalDepthTriangle = () => { 
+const CriticalDepthTriangle = () => {
+  const [dataEntered, setdataEntered] = useState("");
+  const [Data, setData] = useState([]);
+  const [Goal, setGoal] = useState(false);
+  const [Bisection, setBisection] = useState(false);
 
-    const [dataEntered, setdataEntered] = useState('');
-    const [Data,setData] = useState([]);
-    const [Goal, setGoal] = useState(false);
+  const onSubmit = (values) => {
+    const Q = Number(values.caudal);
+    const n = Number(values.nManning);
+    const m1 = Number(values.m1);
+    const m2 = Number(values.m2);
 
-    const HandleSubmit = (e)=>{
-        e.preventDefault();
-        const Q = Number(e.currentTarget.caudal.value);
-        const m1 =  Number(e.currentTarget.m1.value);
-        const m2 =  Number(e.currentTarget.m1.value);
-        const n =  Number(e.currentTarget.nManning.value);
-        const g = 9.80665;
+    const y0 = Number(values.y0);
+    const y1 = Number(values.y1);
+    const tol = Number(values.tol);
 
-        setdataEntered({"Q":Q,"m1":m1,"m2":m2});
+    setdataEntered({ Q: Q, n: n, m1: m1, m2: m2 });
+    const g = 9.80665;
+    const funciondeyc = (y) => {
+      return (
+        [Q * Q * (m1 * y + m2 * y)] -
+        [g * (0.5 * m1 * y * y + 0.5 * m2 * y * y) ** 3]
+      );
+    };
+    let result;
+    result = bisection(funciondeyc, y0, y1, tol);
+    result.failed ? (result.bisection = false) : (result.bisection = true);
+    console.log(result);
 
-        console.log({"Q":Q,"m1":m1,"m2":m2,"n":n});
-        const yc = ((8*Q*Q)/(Math.pow(m1+m2,2)*g))**(1/5)
+    const yc = result.y;
+    const A = AreaTriangle(yc, m1, m2);
+    const P = WettedPerimeterTriangle(yc, m1, m2);
+    const R = HydraulicRadiusTriangle(yc, m1, m2);
+    const T = surfaceWidthTriangle(yc, m1, m2);
+    const D = HydraulicDepthTriangle(yc, m1, m2);
+    const flowType = FlowType(Q, A, D);
+    const V = Q / A;
 
-        const A = AreaTriangle(yc,m1,m2);
-        const P = WettedPerimeterTriangle(yc,m1,m2);
-        const R = HydraulicRadiusTriangle (yc,m1,m2)
-        const T = surfaceWidthTriangle(yc,m1,m2);
-        const D = HydraulicDepthTriangle(yc,m1,m2);
-
-        const F = (Q/A)/ Math.sqrt(g*D);
-        let Sc;
-        if (n !== 0){
-            Sc = ((n*Q)/(A*Math.pow(R,(2/3))))**(2)
-        }
-        console.log("Sc",Sc);
-
-        setData({"y":yc, "A" : A,"P" : P,"R" : R,"T" : T,"D" : D,"F":F,"Sc":Sc});
-        setGoal(true);
+    let Sc;
+    if (n !== 0) {
+      Sc = ((n * Q) / (A * Math.pow(R, 2 / 3))) ** 2;
     }
+    console.log("Sc", Sc);
+    setData({
+      y: yc,
+      V: V,
+      F: flowType.F,
+      flowType: flowType.flowType,
+      A: A,
+      P: P,
+      R: R,
+      T: T,
+      D: D,
+      Sc: Sc,
+    });
+    setGoal(true);
+    setTimeout(() => {
+      scroller.scrollTo("resultsNormalDepthTriangle");
+    }, 500);
+  };
   return (
     <>
-    <NavCriticalDepth active={'triangle'}/>
+      <NavCriticalDepth active={"triangle"} />
 
-    <Container style={{outline:'1px solid #ced4da'}} className='p-5 pt-2'>
-    <Row md="2">
-        <Form onSubmit={HandleSubmit}>
-            <FormGroup row>
-                <Label for="caudal" sm={4}> Caudal (Q)</Label>
-                <Col sm={8}>
-                    <Input id="caudal" name="caudal" placeholder="valor del caudal" type="number" step="any"/>
-                </Col>
-            </FormGroup>
+      <Container style={{ outline: "1px solid #ced4da" }} className="p-5 pt-2">
+        <Row md="2">
+          <Form
+            onSubmit={onSubmit}
+            render={({ handleSubmit, form, submitting, pristine, values }) => (
+              <form onSubmit={handleSubmit}>
+                <Field
+                  name="caudal"
+                  validate={composeValidators(required, mustBeNumber)}
+                >
+                  {({ input, meta }) => (
+                    <div className="row mb-3">
+                      <Col sm={4}>
+                        <label className="col-form-label">Caudal (Q)</label>
+                      </Col>
+                      <Col sm={8}>
+                        <input
+                          {...input}
+                          type="number"
+                          step="any"
+                          placeholder=""
+                          className="form-control"
+                        />
+                        {meta.error && meta.touched && (
+                          <span>{meta.error}</span>
+                        )}
+                      </Col>
+                    </div>
+                  )}
+                </Field>
+                <Field
+                  name="nManning"
+                  validate={composeValidators(required, mustBeNumber)}
+                >
+                  {({ input, meta }) => (
+                    <div className="row mb-3">
+                      <Col sm={8}>
+                        <label className="col-form-label">
+                          Coeficiente de rugosidad de Manning (n)
+                        </label>
+                      </Col>
+                      <Col sm={4}>
+                        <input
+                          {...input}
+                          type="number"
+                          step="any"
+                          placeholder=""
+                          className="form-control"
+                        />
+                        {meta.error && meta.touched && (
+                          <span>{meta.error}</span>
+                        )}
+                      </Col>
+                      <Col sm={12}>
+                        <AlertCalculationsWithn />
+                      </Col>
+                    </div>
+                  )}
+                </Field>
+                <Field
+                  name="m1"
+                  validate={composeValidators(required, mustBeNumber)}
+                >
+                  {({ input, meta }) => (
+                    <div className="row mb-3">
+                      <Col sm={8}>
+                        <label className="col-form-label">
+                          Coeficiente de inclinación talud izquierdo (m1)
+                        </label>
+                      </Col>
+                      <Col sm={4}>
+                        <input
+                          {...input}
+                          type="number"
+                          step="any"
+                          placeholder=""
+                          className="form-control"
+                        />
+                        {meta.error && meta.touched && (
+                          <span>{meta.error}</span>
+                        )}
+                      </Col>
+                    </div>
+                  )}
+                </Field>
+                <Field
+                  name="m2"
+                  validate={composeValidators(required, mustBeNumber)}
+                >
+                  {({ input, meta }) => (
+                    <div className="row mb-3">
+                      <Col sm={8}>
+                        <label className="col-form-label">
+                          Coeficiente de inclinación talud derecho (m2)
+                        </label>
+                      </Col>
+                      <Col sm={4}>
+                        <input
+                          {...input}
+                          type="number"
+                          step="any"
+                          placeholder=""
+                          className="form-control"
+                        />
+                        {meta.error && meta.touched && (
+                          <span>{meta.error}</span>
+                        )}
+                      </Col>
+                    </div>
+                  )}
+                </Field>
 
-            <FormGroup row>
-                <Label for="nManning" sm={8}>
-                Coeficiente de rugosidad de Manning (n)
-                </Label>
-                <Col sm={4}>
-                    <Input id="nManning" name="nManning" placeholder="n de Manning" type="number" step="any"/>
-                </Col>
-                <Col>
-                    <AlertCalculationsWithn/>
-                </Col>
-            </FormGroup>
+                <BisectionForm required={required} />
 
-            <FormGroup row>
-                <Label for="m1" sm={8}> Coeficiente de inclinación talud izquierdo (m1)</Label>
-                <Col sm={4}>
-                    <Input id="m1" name="m1" placeholder="valor de m1" type="number" step="any"/>
-                </Col>
-            </FormGroup>
-
-            <FormGroup row>
-                <Label for="m2" sm={8}> Coeficiente de inclinación talud derecho (m2)</Label>
-                <Col sm={4}>
-                    <Input id="m2" name="m2" placeholder="Valor de m2" type="number" step="any"/>
-                </Col>
-            </FormGroup>
-            <Button>
-                Calcular
-            </Button>
-        </Form>
-        <Row>
-            <Col style={{display:'flex', justifyContent:'center',outline:'1px solid red'}}>
-                <img src={salto} alt="salto"  style={{width:'400px',height:'200px'}}/>
+                <div className="buttons">
+                  <Element name="resultsNormalDepthTriangle">
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={submitting}
+                    >
+                      Calcular
+                    </button>
+                  </Element>
+                </div>
+              </form>
+            )}
+          />
+          <Row>
+            <Col
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                outline: "1px solid red",
+              }}
+            >
+              <img
+                src={trianglechannel}
+                alt="salto"
+                style={{ width: "400px", height: "200px" }}
+              />
             </Col>
-            <Col style={{display:'flex', justifyContent:'center',outline:'1px solid red'}}>
-                <img src={EcnYcTriangle} alt="salto"  style={{width:'300px',height:'100px'}}/>
+            <Col
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                outline: "1px solid red",
+              }}
+            >
+              <img
+                src={EcnYcTriangle}
+                alt="salto"
+                style={{ width: "400px", height: "200px" }}
+              />
             </Col>
+          </Row>
         </Row>
-    </Row>
-    { (Goal)?
-        <Row md="3" className='mt-4' style={{outline:'1px solid red'}}>
-        <CriticalDepthTriangleResults Data={Data}/>
-        <GeometryElements Data={Data} dataEntered={dataEntered}/>
-        <DataEntered dataEntered={dataEntered}/>
-        </Row>: null }
-    </Container>
+
+        {Goal ? (
+          <Row md="3" className="mt-4" style={{ outline: "1px solid red" }}>
+            <CriticalDepthTriangleResults Data={Data} />
+            <GeometryElements Data={Data} dataEntered={dataEntered} />
+            <DataEntered dataEntered={dataEntered} />
+          </Row>
+        ) : null}
+        {Data.failed ? (
+          <AlertBisectionFailed
+            x0={Data.y0}
+            x1={Data.y1}
+            fx0={Data.fy0}
+            fx1={Data.fy1}
+          />
+        ) : null}
+      </Container>
+      <Container>
+        {Bisection ? <TableBisection Data={Data.data} /> : null}
+      </Container>
     </>
-  )
-}
+  );
+};
 
 export default CriticalDepthTriangle;
